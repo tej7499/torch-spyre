@@ -52,30 +52,32 @@ class SpyreSDSCKernelRunner:
         name: str,
         code_dir: str,
         kernel_provenance: KernelProvenanceDescriptor | None = None,
+        sdsc_bundle_dir_prefix: str = None,
     ):
         self.kernel_name = name
         self.code_dir = code_dir
         self.kernel_provenance = kernel_provenance
-        self.profiler_event_name: str | None
+        self.profiler_name: str | None
         spyrecode_dir = code_dir + "/spyreCodeDir"
         if kernel_provenance is None:
-            self.profiler_event_name = None
-            self.jobplan = prepare_kernel(spyrecode_dir)
-        else:
-            self.profiler_event_name = format_kernel_provenance_event_name(
-                kernel_provenance
+            self.profiler_name = None
+            self.jobplan = prepare_kernel(
+                spyrecode_dir, sdsc_bundle_dir_prefix=sdsc_bundle_dir_prefix
             )
+        else:
+            self.profiler_name = format_kernel_provenance_event_name(kernel_provenance)
             # Rejection is intentionally fail-open: C++ warns and counts
             # conflicts while the key-bearing name remains the compatibility
             # join.
             register_kernel_provenance(
-                self.profiler_event_name,
+                self.profiler_name,
                 list(kernel_provenance.debug_handle_ids),
             )
             with torch.profiler.record_function(f"prepare_kernel:{self.kernel_name}"):
                 self.jobplan = prepare_kernel(
                     spyrecode_dir,
-                    profiler_name=self.profiler_event_name,
+                    profiler_name=self.profiler_name,
+                    sdsc_bundle_dir_prefix=sdsc_bundle_dir_prefix,
                 )
 
     @with_ffdc(CATEGORY_RUNTIME_LAUNCH, logger)

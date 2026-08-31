@@ -675,10 +675,11 @@ class TestKernelProvenancePropagation:
                 "sdsc_fused_mm_0",
                 "/tmp/kernel",
                 kernel_provenance=descriptor,
+                sdsc_bundle_dir_prefix="deadbeef",
             )
 
         assert runner.kernel_provenance is descriptor
-        assert runner.profiler_event_name == _event_name(descriptor)
+        assert runner.profiler_name == _event_name(descriptor)
         assert runner.jobplan == "jobplan"
         register_kernel_provenance.assert_called_once_with(
             _event_name(descriptor), list(descriptor.debug_handle_ids)
@@ -686,6 +687,7 @@ class TestKernelProvenancePropagation:
         prepare_kernel.assert_called_once_with(
             "/tmp/kernel/spyreCodeDir",
             profiler_name=_event_name(descriptor),
+            sdsc_bundle_dir_prefix="deadbeef",
         )
 
     def test_runner_preserves_legacy_prepare_call_without_descriptor(self):
@@ -701,6 +703,9 @@ class TestKernelProvenancePropagation:
             runner = SpyreSDSCKernelRunner("sdsc_fused_mm_0", "/tmp/kernel")
 
         assert runner.kernel_provenance is None
-        assert runner.profiler_event_name is None
-        prepare_kernel.assert_called_once_with("/tmp/kernel/spyreCodeDir")
+        assert runner.profiler_name is None
+        prepare_kernel.assert_called_once_with(
+            "/tmp/kernel/spyreCodeDir",
+            sdsc_bundle_dir_prefix=None,
+        )
         register_kernel_provenance.assert_not_called()
