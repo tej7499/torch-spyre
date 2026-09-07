@@ -20,6 +20,7 @@ import hashlib
 import json
 import os
 import tempfile
+import uuid
 
 import pytest
 import torch
@@ -868,6 +869,53 @@ class TestPrepareKernel:
             )
             assert "HostCompute" in err_permuted
 
+    def test_sdsc_bundle_dir_prefix_registered_via_provenance_profiler_name(self):
+        """prepare_kernel with profiler_name registers the prefix under that name."""
+        profiler_name = "spyre_kernel_v1_fused_mm_" + "a" * 16
+        sdsc_bundle_dir_prefix = uuid.uuid4().hex[:8]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            spyrecode_dir = self.create_mock_spyrecode(tmpdir)
+            torch_spyre._C.prepare_kernel(
+                spyrecode_dir,
+                profiler_name=profiler_name,
+                sdsc_bundle_dir_prefix=sdsc_bundle_dir_prefix,
+            )
+        assert torch_spyre._C.lookup_bundle_dir_prefix(profiler_name) == sdsc_bundle_dir_prefix
+
+    def test_sdsc_bundle_dir_prefix_registered_without_provenance_profiler_name(self):
+        """Without a profiler_name (no provenance key), the prefix is still
+        registered under the directory-derived name_base and can be looked up.
+
+        This is the critical case: kernels compiled without a kernel-provenance
+        descriptor have no profiler_name, so the activity handler must still be
+        able to emit sdsc_bundle_dir_prefix by falling back to the directory
+        path as the registry key.
+        """
+        sdsc_bundle_dir_prefix = uuid.uuid4().hex[:8]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            spyrecode_dir = self.create_mock_spyrecode(tmpdir)
+            # No profiler_name — no provenance key is generated.
+            torch_spyre._C.prepare_kernel(
+                spyrecode_dir,
+                sdsc_bundle_dir_prefix=sdsc_bundle_dir_prefix,
+            )
+            # The name_base used by JobPlanBuilder mirrors the directory fallback
+            # in translateComputeOnDevice: <sdsc_dir>/<spyreCodeDir>/bundle.mlir
+            sdsc_dir = os.path.basename(tmpdir)
+            expected_name_base = os.path.join(sdsc_dir, "spyreCodeDir", "bundle.mlir")
+            assert torch_spyre._C.lookup_bundle_dir_prefix(expected_name_base) == sdsc_bundle_dir_prefix
+
+@pytest.mark.parametrize(
+    ("profiler_name", "expected_activity_name_base"),
+        [
+            ("spyre_kernel_v1_fused_mm_aaaaaaaaaaaaaaaa", "spyre_kernel_v1_fused_mm_aaaaaaaaaaaaaaaa"),
+            ("spyre_kernel_v1_fused_mm_aaaaaaaaaaaaaaaa#17", "spyre_kernel_v1_fused_mm_aaaaaaaaaaaaaaaa"),
+            ("spyre_kernel_v1_fused_mm_aaaaaaaaaaaaaaaa#step", "spyre_kernel_v1_fused_mm_aaaaaaaaaaaaaaaa#step"),
+            ("spyre_kernel_v1_fused_mm_aaaaaaaaaaaaaaaa#", "spyre_kernel_v1_fused_mm_aaaaaaaaaaaaaaaa"),
+        ],
+    )
+def test_activity_name_base(profiler_name, expected_activity_name_base):
+    assert torch_spyre._C.activity_name_base(profiler_name) == expected_activity_name_base
 
 # The canonical correction triple, as parallel (StepKind, StreamRole) name
 # lists: [HostCompute(Prep), H2D(Prep), Compute(Dev)]. This is what
