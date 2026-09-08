@@ -76,7 +76,7 @@ def _check_ktir_device_prerequisites() -> None:
         )
 
 
-def get_output_dir(kernel_name: str, sdsc_bundle_dir_prefix: str = None):
+def get_output_dir(kernel_name: str, sdsc_bundle_dir_prefix: str | None = None):
     spyre_dir = os.path.join(cache_dir(), "inductor-spyre")
     os.makedirs(spyre_dir, exist_ok=True)
     kernel_output_dir = tempfile.mkdtemp(
@@ -372,7 +372,12 @@ class SpyreAsyncCompile(AsyncCompile):
                 )
                 raise
 
-        return SpyreSDSCKernelRunner(kernel_name, output_dir, sdsc_bundle_dir_prefix)
+        return SpyreSDSCKernelRunner(
+            kernel_name,
+            output_dir,
+            kernel_provenance=None,
+            sdsc_bundle_dir_prefix=sdsc_bundle_dir_prefix
+        )
 
     def wait(self, scope: dict[str, Any]) -> None:
         super().wait(scope)
