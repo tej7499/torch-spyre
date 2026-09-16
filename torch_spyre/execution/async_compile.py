@@ -343,6 +343,7 @@ class _SpyreCompileFuture(CodeCacheFuture):
         kernel_provenance,
         symbol_kinds,
         cache_key: str | None = None,
+        sdsc_bundle_dir_prefix: str | None = None,
     ) -> None:
         self._task = task
         self._kernel_name = kernel_name
@@ -350,6 +351,7 @@ class _SpyreCompileFuture(CodeCacheFuture):
         self._kernel_provenance = kernel_provenance
         self._symbol_kinds = symbol_kinds
         self._cache_key = cache_key
+        self._sdsc_bundle_dir_prefix = sdsc_bundle_dir_prefix
         self._runner: SpyreSDSCKernelRunner | None = None
         self._failure_dir_moved = False
 
@@ -373,6 +375,10 @@ class _SpyreCompileFuture(CodeCacheFuture):
         code_dir = self._compile_dir
         if self._cache_key is not None:
             code_dir = commit_compile_dir(self._compile_dir, self._cache_key)
+
+        # sdsc_bundle_dir_prefix selection:
+        # cached path  — first 16 hex chars of cache_key (64 bits).
+        # no-cache path — 8-char UUID prefix.
         self._runner = _prepare_kernel(
             self._kernel_name,
             code_dir,
@@ -461,6 +467,7 @@ class SpyreAsyncCompile(AsyncCompile):
         kernel_provenance,
         symbol_kinds,
         cache_key: str | None = None,
+        sdsc_bundle_dir_prefix: str | None = None,
     ) -> _SpyreCompileFuture:
         future = _SpyreCompileFuture(
             task,
@@ -469,6 +476,7 @@ class SpyreAsyncCompile(AsyncCompile):
             kernel_provenance,
             symbol_kinds,
             cache_key=cache_key,
+            sdsc_bundle_dir_prefix=sdsc_bundle_dir_prefix,
         )
         self._pending_spyre_futures.append(future)
         return future
@@ -531,6 +539,7 @@ class SpyreAsyncCompile(AsyncCompile):
             # Hash the specs in-memory before compiling.  On a cache hit
             # neither generate_bundle nor the backend compiler runs at all
             # (only the kernel_name.txt marker is touched).
+            # sdsc_bundle_dir_prefix on the cached path is cache_key[:16].
             try:
                 cache_key = compute_specs_hash(
                     specs,
@@ -558,6 +567,7 @@ class SpyreAsyncCompile(AsyncCompile):
                         cached_dir,
                         kernel_provenance,
                         load_symbol_kinds(cached_dir),
+                        cache_key[:16],
                     )
 
                 logger.debug("Cache MISS: Compiling kernel")
@@ -589,8 +599,9 @@ class SpyreAsyncCompile(AsyncCompile):
                         )
                     cached_dir = commit_compile_dir(compile_dir, cache_key)
                     logger.debug("Kernel compiled and cached at: %s", cached_dir)
+
                     return _prepare_kernel(
-                        kernel_name, cached_dir, kernel_provenance, symbol_kinds
+                        kernel_name, cached_dir, kernel_provenance, symbol_kinds, cache_key[:16],
                     )
                 except Exception:  # subprocess.CalledProcessError:
                     # Move the failed dir to failed/ for manual debugging
@@ -601,6 +612,7 @@ class SpyreAsyncCompile(AsyncCompile):
         # Caching disabled (SPYRE_KERNEL_CACHE=0, force_disable_caches, or
         # frontend-only). Compile into a throw-away temp dir that lives for this
         # process only.
+        # sdsc_bundle_dir_prefix on the no-cache path is a 8-char UUID hex prefix.
         sdsc_bundle_dir_prefix = uuid.uuid4().hex[:8]
         output_dir = get_output_dir(kernel_name, sdsc_bundle_dir_prefix)
         symbol_kinds = _compile_to_dir(kernel_name, output_dir, specs, pool_size)
@@ -616,6 +628,7 @@ class SpyreAsyncCompile(AsyncCompile):
                 output_dir,
                 kernel_provenance,
                 symbol_kinds,
+                sdsc_bundle_dir_prefix=sdsc_bundle_dir_prefix,
             )
 
         return _prepare_kernel(
@@ -678,6 +691,7 @@ class SpyreAsyncCompile(AsyncCompile):
 
         # Persist the emitted KTIR as a text file in the same per-kernel output
         # dir as sdsc's bundle.
+        # sdsc_bundle_dir_prefix on the KTIR path is a 8-char UUID hex prefix.
         sdsc_bundle_dir_prefix = uuid.uuid4().hex[:8]
         output_dir = get_output_dir(kernel_name, sdsc_bundle_dir_prefix)
         ktir_path = os.path.join(output_dir, f"{_safe_kernel_name(kernel_name)}.ktir")
