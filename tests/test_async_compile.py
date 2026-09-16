@@ -44,8 +44,8 @@ class _RecordingPool:
         return future
 
 
-def _runner(name, code_dir, kernel_provenance=None, symbol_kinds=None):
-    return name, code_dir, kernel_provenance, symbol_kinds
+def _runner(name, code_dir, kernel_provenance=None, symbol_kinds=None, sdsc_bundle_dir_prefix=None):
+    return name, code_dir, kernel_provenance, symbol_kinds, sdsc_bundle_dir_prefix
 
 
 def test_sdsc_submits_all_dxp_jobs_before_wait():
@@ -62,6 +62,9 @@ def test_sdsc_submits_all_dxp_jobs_before_wait():
     def submit(fn, *args):
         events.append(("submit", args[0]))
         return real_submit(fn, *args)
+
+    fake_uuid = MagicMock()
+    fake_uuid.hex = FIXED_UUID_HEX
 
     with (
         torch._inductor.config.patch({"compile_threads": 2}),
@@ -83,6 +86,7 @@ def test_sdsc_submits_all_dxp_jobs_before_wait():
         patch.object(
             async_compile_mod, "SpyreSDSCKernelRunner", side_effect=_runner
         ) as runner_type,
+        patch("torch_spyre.execution.async_compile.uuid.uuid4", return_value=fake_uuid),
     ):
         scope = {
             "kernel0": compiler.sdsc("sdsc_0", []),
@@ -103,8 +107,8 @@ def test_sdsc_submits_all_dxp_jobs_before_wait():
         compiler.wait(scope)
 
     assert scope == {
-        "kernel0": ("sdsc_0", "/tmp/k0", None, []),
-        "kernel1": ("sdsc_1", "/tmp/k1", None, []),
+        "kernel0": ("sdsc_0", "/tmp/k0", None, [], FIXED_UUID_HEX[:8]),
+        "kernel1": ("sdsc_1", "/tmp/k1", None, [], FIXED_UUID_HEX[:8]),
     }
 
 
