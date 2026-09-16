@@ -43,8 +43,8 @@ class _RecordingPool:
         return future
 
 
-def _runner(name, code_dir, kernel_provenance=None):
-    return name, code_dir, kernel_provenance
+def _runner(name, code_dir, kernel_provenance=None, sdsc_bundle_dir_prefix=None):
+    return name, code_dir, kernel_provenance, sdsc_bundle_dir_prefix
 
 
 def test_sdsc_submits_all_dxp_jobs_before_wait():
@@ -60,6 +60,9 @@ def test_sdsc_submits_all_dxp_jobs_before_wait():
     def submit(fn, *args):
         events.append(("submit", args[0]))
         return real_submit(fn, *args)
+
+    fake_uuid = MagicMock()
+    fake_uuid.hex = FIXED_UUID_HEX
 
     with (
         torch._inductor.config.patch({"compile_threads": 2}),
@@ -81,6 +84,7 @@ def test_sdsc_submits_all_dxp_jobs_before_wait():
         patch.object(
             async_compile_mod, "SpyreSDSCKernelRunner", side_effect=_runner
         ) as runner_type,
+        patch("torch_spyre.execution.async_compile.uuid.uuid4", return_value=fake_uuid),
     ):
         scope = {
             "kernel0": compiler.sdsc("sdsc_0", []),
@@ -101,8 +105,8 @@ def test_sdsc_submits_all_dxp_jobs_before_wait():
         compiler.wait(scope)
 
     assert scope == {
-        "kernel0": ("sdsc_0", "/tmp/k0", None),
-        "kernel1": ("sdsc_1", "/tmp/k1", None),
+        "kernel0": ("sdsc_0", "/tmp/k0", None, FIXED_UUID_HEX[:8]),
+        "kernel1": ("sdsc_1", "/tmp/k1", None, FIXED_UUID_HEX[:8]),
     }
 
 
@@ -138,7 +142,7 @@ def test_async_cache_commit_is_deferred_until_wait():
         compiler.wait(scope)
 
     commit.assert_called_once_with("/tmp/key.tmp", "key")
-    assert scope["kernel"] == ("sdsc_0", "/cache/key", None)
+    assert scope["kernel"] == ("sdsc_0", "/cache/key", None, "key")
 
 
 def test_async_compile_failure_moves_cache_entry_at_wait():
@@ -215,7 +219,7 @@ def test_wait_drains_remaining_spyre_futures_after_failure():
             compiler.wait(scope)
 
     commit.assert_called_once_with("/tmp/key1.tmp", "key1")
-    assert scope["kernel1"].result() == ("sdsc_1", "/cache/key1", None)
+    assert scope["kernel1"].result() == ("sdsc_1", "/cache/key1", None, "key1")
     assert [call.args[0] for call in move_failed.call_args_list] == [
         "/tmp/key0.tmp",
         "/tmp/key2.tmp",
