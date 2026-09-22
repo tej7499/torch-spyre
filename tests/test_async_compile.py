@@ -533,6 +533,7 @@ def test_cache_hit_runner_gets_16char_prefix():
         scope = {"kernel": compiler.sdsc("sdsc_0", [])}
 
         # Cache hit: runner created immediately inside sdsc(), no wait() needed
+        # prefix must be the first 16 characters of the cache key
         assert runners_created == [cache_key[:16]]
         assert scope["kernel"][4] == cache_key[:16]
 
@@ -589,7 +590,7 @@ def test_cache_miss_async_runner_gets_16char_prefix():
         pool.futures[0].set_result("compiled")
         compiler.wait(scope)
 
-    # After wait(): prefix must be the first 16 chars of the cache key
+    # After wait(): prefix must be the first 16 characters of the cache key
     assert runners_created == [cache_key[:16]]
     assert scope["kernel"][4] == cache_key[:16]
 
@@ -638,7 +639,7 @@ def test_cache_miss_sync_runner_gets_16char_prefix():
         scope = {"kernel": compiler.sdsc("sdsc_0", [])}
 
         # Sync path: runner is created immediately, no wait() needed
-        # prefix must be the first 16 chars of the cache key
+        # prefix must be the first 16 characters of the cache key
         assert runners_created == [cache_key[:16]]
         assert scope["kernel"][4] == cache_key[:16]
 
@@ -686,7 +687,7 @@ def test_cache_disabled_async_runner_gets_8char_uuid():
         pool.futures[0].set_result("compiled")
         compiler.wait(scope)
 
-    # After wait(): prefix must be the first 8 chars of the uuid prefix
+    # After wait(): prefix must be the first 8 hex characters of the uuid prefix
     expected_prefix = FIXED_UUID_HEX[:8]
     assert runners_created == [expected_prefix]
     assert scope["kernel"][4] == expected_prefix
@@ -729,7 +730,7 @@ def test_cache_disabled_sync_runner_gets_8char_uuid():
         scope = {"kernel": compiler.sdsc("sdsc_0", [])}
 
         # Sync path: runner is created immediately, no wait() needed
-        # prefix must be the first 8 chars of the uuid prefix
+        # prefix must be the first 8 hex characters of the uuid prefix
         expected_prefix = FIXED_UUID_HEX[:8]
         assert runners_created == [expected_prefix]
         assert scope["kernel"][4] == expected_prefix
