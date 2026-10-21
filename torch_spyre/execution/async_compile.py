@@ -609,7 +609,11 @@ class SpyreAsyncCompile(AsyncCompile):
                     logger.debug("Kernel compiled and cached at: %s", cached_dir)
 
                     return _prepare_kernel(
-                        kernel_name, cached_dir, kernel_provenance, symbol_kinds, cache_key[:16],
+                        kernel_name,
+                        cached_dir,
+                        kernel_provenance,
+                        symbol_kinds,
+                        cache_key[:16],
                     )
                 except Exception:  # subprocess.CalledProcessError:
                     # Move the failed dir to failed/ for manual debugging
@@ -640,11 +644,11 @@ class SpyreAsyncCompile(AsyncCompile):
             )
 
         return _prepare_kernel(
-                kernel_name,
-                output_dir,
-                kernel_provenance,
-                symbol_kinds,
-                sdsc_bundle_dir_prefix,
+            kernel_name,
+            output_dir,
+            kernel_provenance,
+            symbol_kinds,
+            sdsc_bundle_dir_prefix,
         )
 
     def ktir(

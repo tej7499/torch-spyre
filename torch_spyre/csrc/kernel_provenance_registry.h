@@ -44,6 +44,7 @@ std::string activityNameBase(const std::string& activity_name);
  * Register the SDSC bundle directory prefix for an activity name base.
  * Stored unconditionally at prepare_kernel time so it is available for every
  * kernel regardless of whether provenance is present.
+ * Last registration wins i.e. an event resolves to the most recently prepared runner.
  */
 void registerBundleDirPrefix(const std::string& name_base,
                              std::string sdsc_bundle_dir_prefix);
