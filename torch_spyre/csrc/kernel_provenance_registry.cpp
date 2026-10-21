@@ -154,7 +154,8 @@ void registerBundleDirPrefix(const std::string& name_base,
   auto& reg = bundleDirPrefixRegistry();
   // No lock needed; see BundleDirPrefixRegistry for the full rationale.
   // std::unique_lock<std::shared_mutex> lock(reg.mutex);
-  // Last registration wins i.e. an event resolves to the most recently prepared runner.
+  // Last registration wins i.e. an event resolves to the most recently prepared
+  // runner.
   reg.entries.insert_or_assign(name_base, std::move(sdsc_bundle_dir_prefix));
 }
 
